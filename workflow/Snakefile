@@ -1,0 +1,234 @@
+configfile: "config/config.yml"
+
+##################################################################
+##                    Define input functions                    ##
+##################################################################
+
+# this was created after reading 
+#  https://eriqande.github.io/eca-bioinf-handbook/managing-workflows-with-snakemake.html
+#  https://www.biostars.org/p/335903/
+
+# this imports the pandas package functionality in an object named pd
+import pandas as pd
+
+# this reads the CSV file and sets an index using the values in the "sample" column.
+samples_table = pd.read_csv(config["samples_table"]).set_index("sample", drop=False)
+
+# fastq filename input function definition set to Python dictionary
+def fq_dict_from_sample(wildcards):
+  return {
+    "sample": [ samples_table.loc[wildcards.sample, "fastq1"], samples_table.loc[wildcards.sample, "fastq2"] ]
+    #"fq1": samples_table.loc[wildcards.sample, "fastq1"],
+    #"fq2": samples_table.loc[wildcards.sample, "fastq2"]
+  }
+
+##################################################################
+##                           rules                              ##
+##################################################################
+
+# to run snakemake without explicitly requesting any output files on the command line, we must request output files in the first rule. Therefore we include this otherwise useless rule here  
+rule all:
+    input:
+        expand("results/bedgraphs/{sample}_rfd.bedgraph",sample=samples_table.index),
+
+
+##################################################################
+##                          Trim reads                          ##
+##################################################################
+
+rule fastp_pe:
+    input:
+        unpack(fq_dict_from_sample)
+    output:
+        trimmed=["results/trimmed/pe/{sample}.1.fastq", "results/trimmed/pe/{sample}.2.fastq"],
+        unpaired1="results/trimmed/pe/{sample}.u1.fastq",
+        unpaired2="results/trimmed/pe/{sample}.u2.fastq",
+        merged="results/trimmed/pe/{sample}.merged.fastq",
+        failed="results/trimmed/pe/{sample}.failed.fastq",
+        html="results/report/pe/{sample}.html",
+        json="results/report/pe/{sample}.json"
+    log:
+        "results/logs/fastp/pe/{sample}.log"
+    envmodules:
+         "fastp/0.23.2",
+         #"miniconda/4.11.0"
+    params:
+        extra="--merge"
+    threads: 2
+    wrapper:
+        "v1.3.2/bio/fastp"
+
+#################################################################
+##                    Align reads to genome                    ##
+#################################################################
+
+rule bwa_mem:
+    input:
+        reads=["results/trimmed/pe/{sample}.1.fastq", "results/trimmed/pe/{sample}.2.fastq"],
+        idx=config["bwa_genome"]
+    output:
+        "results/mapped/{sample}.bam",
+    log:
+        "results/logs/bwa_mem/{sample}.log",
+    envmodules:
+         "bwa/0.7.15",
+         "samtools/1.14",
+         "picard/2.21.2",
+         #"miniconda/4.11.0"
+    params:
+        extra=r"-R '@RG\tID:{sample}\tSM:{sample}'",
+        sorting="samtools",  # Can be 'none', 'samtools' or 'picard'.
+        sort_order="coordinate",  # Can be 'queryname' or 'coordinate'.
+        sort_extra="",  # Extra args for samtools/picard.
+    threads: 8
+    wrapper:
+        "v1.3.2/bio/bwa/mem"
+
+#################################################################
+##                      Index Bam File                         ##
+#################################################################
+
+rule samtools_index:
+    input:
+        "results/mapped/{sample}.bam",
+    output:
+        "results/mapped/{sample}.bam.bai",
+    log:
+        "results/logs/samtools_index/{sample}.log",
+    envmodules:
+        "samtools/1.14",
+        #"miniconda/4.11.0"
+    params:
+        extra="",  # optional params string
+    threads: 4  # This value - 1 will be sent to -@
+    wrapper:
+        "v1.3.2/bio/samtools/index"
+
+
+#################################################################
+##                 Mark and Remove Duplicates                  ##
+#################################################################
+
+rule remove_duplicates:
+    input:
+        bam="results/mapped/{sample}.bam",
+    params:
+        memory=config["picard_memory"]
+    output:
+        marked_bam="results/dedup/{sample}.bam",
+        marked_metrics="results/logs/picard_metrics/{sample}.marked.duplicates_metrics.txt"
+    envmodules:
+        "picard/2.21.2"
+    conda:
+        "envs/RTEnv.yml"
+    log: "results/logs/snakelogs/mark_duplicates_with_picard.{sample}.log"
+    shell:
+        """
+        JAVA_MEM_OPTS={params.memory}
+        RAM=$(echo $JAVA_MEM_OPTS | rev | cut -c2- | rev)
+        picard MarkDuplicates COMPRESSION_LEVEL=9 VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=$((200000*RAM)) CREATE_INDEX=true I={input.bam} O={output.marked_bam} M={output.marked_metrics}
+        """
+
+rule samtools_dedup_index:
+    input:
+        "results/dedup/{sample}.bam",
+    output:
+        "results/dedup/{sample}.bam.bai",
+    log:
+        "results/logs/samtools_index/{sample}.log",
+    envmodules:
+        "samtools/1.14",
+        ##"miniconda/4.11.0"
+    params:
+        extra="",  # optional params string
+    threads: 4  # This value - 1 will be sent to -@
+    wrapper:
+        "v1.3.2/bio/samtools/index"
+
+
+#################################################################
+##                    Split Bam Into Strands                   ##
+#################################################################
+
+rule Get_Watson_Reads:
+    input:
+        "results/dedup/{sample}.bam",
+    output:
+        "results/split/{sample}_w.bam",
+    params:
+        additional_params = "-script 'workflow/scripts/watson_bamtools.json'"
+    log:
+        "logs/bamtools/filtered/{sample}_Get_Watson_Reads.log"
+    envmodules:
+        "bamtools/2.5.1",
+    wrapper:
+        "v1.3.2/bio/bamtools/filter"
+
+rule samtools_index_Watson_Reads:
+    input:
+        "results/split/{sample}_w.bam",
+    output:
+        "results/split/{sample}_w.bam.bai",
+    log:
+        "results/logs/samtools_index/{sample}_samtools_index_Watson_Reads.log",
+    envmodules:
+        "samtools/1.14",
+        ##"miniconda/4.11.0"
+    params:
+        extra="",  # optional params string
+    threads: 4  # This value - 1 will be sent to -@
+    wrapper:
+        "v1.3.2/bio/samtools/index"
+
+rule Get_Crick_Reads:
+    input:
+        "results/dedup/{sample}.bam",
+    output:
+        "results/split/{sample}_c.bam",
+    params:
+        additional_params = "-script 'workflow/scripts/crick_bamtools.json'"
+    log:
+        "logs/bamtools/filtered/{sample}_Get_Crick_Reads.log"
+    envmodules:
+         "bamtools/2.5.1",
+    wrapper:
+        "v1.3.2/bio/bamtools/filter"
+
+rule samtools_index_Crick_Reads:
+    input:
+        "results/split/{sample}_c.bam",
+    output:
+        "results/split/{sample}_c.bam.bai",
+    log:
+        "results/logs/samtools_index/{sample}_samtools_index_Crick_Reads.log",
+    envmodules:
+        "samtools/1.14",
+        #"miniconda/4.11.0"
+    params:
+        extra="",  # optional params string
+    threads: 4  # This value - 1 will be sent to -@
+    wrapper:
+        "v1.3.2/bio/samtools/index"
+
+
+#################################################################
+##         Calculate Replication Fork Directionality           ##
+#################################################################
+
+rule calculate_rfd:
+    input:
+        "results/split/{sample}_c.bam",
+        "results/split/{sample}_c.bam.bai",
+        "results/split/{sample}_w.bam",
+        "results/split/{sample}_w.bam.bai",
+    output:
+        "results/bedgraphs/{sample}_rfd.bedgraph",
+        "results/bedgraphs/{sample}_w.bedgraph",
+        "results/bedgraphs/{sample}_c.bedgraph"
+    envmodules:
+        "R/4.1.2-mkl",
+        "bioconductor/3.14",
+        #"miniconda/4.11.0"
+    script:
+        "scripts/calculate_RFD.R"
+
