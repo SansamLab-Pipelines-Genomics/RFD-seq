@@ -8,7 +8,8 @@
 ![LastCommit](https://img.shields.io/github/last-commit/SansamLab/RFD-seq)
 ![Downloads](https://img.shields.io/github/downloads/SansamLab/RFD-seq/total)
 ![OpenIssues](https://img.shields.io/github/issues-raw/SansamLab/RFD-seq)
-[![DOI](https://zenodo.org/badge/472901755.svg)](https://zenodo.org/badge/latestdoi/472901755)
+[![DOI](https://zenodo.org/badge/483391651.svg)](https://zenodo.org/badge/latestdoi/483391651)
+
 
 
 Pipeline for calculating replication fork directionality from methods such as OK-seq or GLOE-seq
