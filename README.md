@@ -1,7 +1,8 @@
 # RFD-seq
 
-![Release](https://img.shields.io/github/v/release/SansamLab/RFD-seq)
-![ReleaseDate](https://img.shields.io/github/release-date/SansamLab/RFD-seq)
+
+![Release](https://img.shields.io/github/v/release/SansamLab/RFD-seq?include_prereleases)
+![ReleaseDate](https://img.shields.io/github/release-date/SansamLab/RFD-seq?include_prereleases)
 ![Size](https://img.shields.io/github/repo-size/SansamLab/RFD-seq)
 ![License](https://img.shields.io/github/license/SansamLab/RFD-seq)
 ![LastCommit](https://img.shields.io/github/last-commit/SansamLab/RFD-seq)
