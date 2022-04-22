@@ -17,7 +17,8 @@ samples_table = pd.read_csv(config["samples_table"]).set_index("sample", drop=Fa
 # fastq filename input function definition set to Python dictionary
 def fq_dict_from_sample(wildcards):
   return {
-    "sample": [ samples_table.loc[wildcards.sample, "fastq1"], samples_table.loc[wildcards.sample, "fastq2"] ]
+    "fq1": samples_table.loc[wildcards.sample, "fastq1"],
+    "fq2": samples_table.loc[wildcards.sample, "fastq2"]
   }
 
 ##################################################################
@@ -34,27 +35,22 @@ rule all:
 ##                          Trim reads                          ##
 ##################################################################
 
-rule fastp_pe:
+rule fastp_se:
     input:
-        unpack(fq_dict_from_sample)
-    output:
-        trimmed=["results/trimmed/pe/{sample}.1.fastq", "results/trimmed/pe/{sample}.2.fastq"],
-        unpaired1="results/trimmed/pe/{sample}.u1.fastq",
-        unpaired2="results/trimmed/pe/{sample}.u2.fastq",
-        merged="results/trimmed/pe/{sample}.merged.fastq",
-        failed="results/trimmed/pe/{sample}.failed.fastq",
-        html="results/report/pe/{sample}.html",
-        json="results/report/pe/{sample}.json"
-    log:
-        "results/logs/fastp/pe/{sample}.log"
-    envmodules:
-         "fastp/0.23.2",
-         #"miniconda/4.11.0"
+        unpack(fq_dict_from_sample)   # <--- we need to wrap our input function inside a special Snakemake function called unpack() which turns the dict into a collection of named inputs
     params:
-        extra="--merge"
-    threads: 2
-    wrapper:
-        "v1.3.2/bio/fastp"
+        threads=config["fastp_cpus"]
+    output:
+        trimmed="results/trimmed/se/{sample}.1.fastq",
+        fastp_report="results/qc/fastp_reports/{sample}.html",
+        fastp_json="results/qc/fastp_reports/{sample}.json"
+    envmodules:
+        "fastp/0.23.2"
+    log: "results/logs/snakelogs/trim_reads_with_fastp.{sample}.log"
+    shell:
+        """
+        fastp -i {input.fq1} -o {output.trimmed} -h {output.fastp_report} --json {output.fastp_json} -R "{wildcards.sample}" -w {params.threads}
+        """
 
 #################################################################
 ##                    Align reads to genome                    ##
@@ -62,7 +58,7 @@ rule fastp_pe:
 
 rule bwa_mem:
     input:
-        reads=["results/trimmed/pe/{sample}.1.fastq", "results/trimmed/pe/{sample}.2.fastq"],
+        reads=["results/trimmed/se/{sample}.1.fastq"],
         idx=config["bwa_genome"]
     output:
         "results/mapped/{sample}.bam",
@@ -149,7 +145,7 @@ rule Get_Watson_Reads:
     output:
         "results/split/{sample}_w.bam",
     params:
-        additional_params = "-script 'workflow/scripts/watson_bamtools.json'"
+        additional_params = "-script 'workflow/scripts/watson_bamtools_se.json'"
     log:
         "logs/bamtools/filtered/{sample}_Get_Watson_Reads.log"
     envmodules:
@@ -178,7 +174,7 @@ rule Get_Crick_Reads:
     output:
         "results/split/{sample}_c.bam",
     params:
-        additional_params = "-script 'workflow/scripts/crick_bamtools.json'"
+        additional_params = "-script 'workflow/scripts/crick_bamtools_se.json'"
     log:
         "logs/bamtools/filtered/{sample}_Get_Crick_Reads.log"
     envmodules:
@@ -220,5 +216,5 @@ rule calculate_rfd:
         "R/4.1.2-mkl",
         "bioconductor/3.14",
     script:
-        "scripts/calculate_RFD.R"
+        "scripts/calculate_RFD_se.R"
 

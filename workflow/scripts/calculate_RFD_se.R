@@ -38,15 +38,11 @@ gr <- gr[which(as.vector(seqnames(gr) %in% sqnames))]
 
 # count reads on watson strand
 watson <- bamCount(negBamFile,
-                   gr,
-                   ss=FALSE,
-                   paired.end="midpoint")
+                   gr)
 
 # count reads on crick strand
 crick <- bamCount(posBamFile,
-                   gr,
-                   ss=FALSE,
-                   paired.end="midpoint")
+                   gr)
 
 
 # read blacklist windows into dataframe and convert to genomic ranges
@@ -65,15 +61,11 @@ bl_gr <- subsetByOverlaps(disjoined_gr,bl_gr_temp,maxgap = -1)
 
 # count reads on watson strand in blacklisted windows
 bl_watson <- bamCount(negBamFile,
-                   bl_gr,
-                   ss=FALSE,
-                   paired.end="midpoint")
+                   bl_gr)
 
 # count reads on crick strand in blacklisted windows
 bl_crick <- bamCount(posBamFile,
-                   bl_gr,
-                   ss=FALSE,
-                   paired.end="midpoint")
+                   bl_gr)
 
 # find windows overlapping blacklist regions
 overlaps_df <- as.data.frame(findOverlaps(bl_gr,gr))
