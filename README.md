@@ -1,4 +1,6 @@
-# SnakemakeRepositoryTemplate
+# RFD-seq
+
+Pipeline for calculating replication fork directionality from methods such as OK-seq or GLOE-seq
 
 ### 1.  Load slurm and miniconda
 Note. The commands to do this will be different on your machine. These commands are specific to an HPC using slurm with these modules installed.
