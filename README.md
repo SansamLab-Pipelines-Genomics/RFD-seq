@@ -1,5 +1,15 @@
 # RFD-seq
 
+![Release](https://img.shields.io/github/v/release/SansamLab/RFD-seq)
+![ReleaseDate](https://img.shields.io/github/release-date/SansamLab/RFD-seq)
+![Size](https://img.shields.io/github/repo-size/SansamLab/RFD-seq)
+![License](https://img.shields.io/github/license/SansamLab/RFD-seq)
+![LastCommit](https://img.shields.io/github/last-commit/SansamLab/RFD-seq)
+![Downloads](https://img.shields.io/github/downloads/SansamLab/RFD-seq/total)
+![OpenIssues](https://img.shields.io/github/issues-raw/SansamLab/RFD-seq)
+[![DOI](https://zenodo.org/badge/472901755.svg)](https://zenodo.org/badge/latestdoi/472901755)
+
+
 Pipeline for calculating replication fork directionality from methods such as OK-seq or GLOE-seq
 
 ### 1.  Load slurm and miniconda
